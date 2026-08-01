@@ -54,28 +54,28 @@ jobs:
           EOF
           ls -l /opt/pacbrew/ps4/openorbis/usr/include/GLES2/gl2platform.h
 
-- name: Run CMake
-  run: |
-    mkdir -p cmake-build
-    cd cmake-build
+      - name: Run CMake
+        run: |
+          mkdir -p cmake-build
+          cd cmake-build
     
-    if [ -f "/opt/pacbrew/ps4/openorbis/share/toolchain.cmake" ]; then
-      TOOLCHAIN="/opt/pacbrew/ps4/openorbis/share/toolchain.cmake"
-    else
-      TOOLCHAIN="../cmake/ps4.cmake"
-    fi
+          if [ -f "/opt/pacbrew/ps4/openorbis/share/toolchain.cmake" ]; then
+          TOOLCHAIN="/opt/pacbrew/ps4/openorbis/share/toolchain.cmake"
+          else
+          TOOLCHAIN="../cmake/ps4.cmake"
+          fi
 
-    # Fix the missing dash in sysroot if passed through CFLAGS
-    export CFLAGS="${CFLAGS} --sysroot=/opt/pacbrew/ps4/openorbis"
-    export CXXFLAGS="${CXXFLAGS} --sysroot=/opt/pacbrew/ps4/openorbis"
+          # Fix the missing dash in sysroot if passed through CFLAGS
+          export CFLAGS="${CFLAGS} --sysroot=/opt/pacbrew/ps4/openorbis"
+          export CXXFLAGS="${CXXFLAGS} --sysroot=/opt/pacbrew/ps4/openorbis"
 
-    cmake -G "Unix Makefiles" \
-      -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-      -DPLATFORM_PS4=ON \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_C_FLAGS="--sysroot=/opt/pacbrew/ps4/openorbis" \
-      -DCMAKE_CXX_FLAGS="--sysroot=/opt/pacbrew/ps4/openorbis -Wno-error -Wno-unknown-warning-option -Wno-format-truncation -Wno-restrict" \
-      ..
+          cmake -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+            -DPLATFORM_PS4=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="--sysroot=/opt/pacbrew/ps4/openorbis" \
+            -DCMAKE_CXX_FLAGS="--sysroot=/opt/pacbrew/ps4/openorbis -Wno-error -Wno-unknown-warning-option -Wno-format-truncation -Wno-restrict" \
+            ..
 
       - name: Build Executable
         run: |
