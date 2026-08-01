@@ -10,6 +10,10 @@ jobs:
   build-ps4:
     runs-on: ubuntu-24.04
 
+    env:
+      OPENORBIS: /opt/pacbrew/ps4/openorbis
+      OO_PS4_TOOLCHAIN: /opt/pacbrew/ps4/openorbis
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +34,9 @@ jobs:
           EOF
           sudo pacman -Syu --noconfirm
           sudo pacman -S --noconfirm ps4-openorbis ps4-openorbis-portlibs
+          
+          # Add OpenOrbis binaries to GitHub Actions PATH
+          echo "/opt/pacbrew/ps4/openorbis/bin" >> $GITHUB_PATH
 
       - name: Fix missing GLES2 headers
         run: |
@@ -47,23 +54,37 @@ jobs:
           EOF
           ls -l /opt/pacbrew/ps4/openorbis/usr/include/GLES2/gl2platform.h
 
-      - name: Configure
+      - name: Configure CMake
         run: |
-          mkdir -p cmake-build && cd cmake-build
-          export OPENORBIS=/opt/pacbrew/ps4/openorbis
+          mkdir -p cmake-build
+          cd cmake-build
+          
+          # Use the pacbrew toolchain file or fallback to local cmake/ps4.cmake
+          if [ -f "/opt/pacbrew/ps4/openorbis/share/toolchain.cmake" ]; then
+            TOOLCHAIN="/opt/pacbrew/ps4/openorbis/share/toolchain.cmake"
+          else
+            TOOLCHAIN="../cmake/ps4.cmake"
+          fi
+
           cmake -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
             -DPLATFORM_PS4=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Wno-error -Wno-unknown-warning-option -Wno-format-truncation -Wno-restrict" \
             ..
-    
+
+      - name: Build Executable
+        run: |
+          cd cmake-build
+          make -j$(nproc)
+
       - name: Package PKG File
         run: |
           mkdir -p ps4_pkg/sce_sys
           cd ps4_pkg
           orbis-mksfo -title 'SpaghettiKart PS4' -id 'SPAG00064' sce_sys/param.sfo
           
-          # Generate GP4 manifest dynamically
+          # Generate GP4 manifest dynamically pointing to built eboot.bin
           cat << 'EOF' > proj.gp4
           <?xml version="1.0" encoding="utf-8"?>
           <ingame_project version="1">
@@ -76,7 +97,7 @@ jobs:
               <title_id>SPAG00064</title_id>
             </volume>
             <files img_max_size="0">
-              <file orig_path="../build_ps4/eboot.bin" target_path="eboot.bin" />
+              <file orig_path="../cmake-build/eboot.bin" target_path="eboot.bin" />
               <file orig_path="sce_sys/param.sfo" target_path="sce_sys/param.sfo" />
             </files>
           </ingame_project>
