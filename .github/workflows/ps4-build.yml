@@ -8,27 +8,55 @@ on:
 
 jobs:
   build-ps4:
-    runs-on: ubuntu-latest
-    container:
-      image: openorbis/toolchain:latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Create Build Directory & Configure
+      - name: Install dependencies
         run: |
-          mkdir -p build_ps4
-          cd build_ps4
-          cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/ps4.cmake -DCMAKE_BUILD_TYPE=Release ..
+          sudo apt-get update
+          sudo apt-get install -y git build-essential cmake zip \
+            pacman-package-manager makepkg libarchive-tools autoconf libtool nasm curl
 
-      - name: Compile PS4 Binary
+      - name: Install PS4 Toolchain
         run: |
-          cd build_ps4
-          make -j$(nproc)
+          sudo tee -a /etc/pacman.conf > /dev/null <<EOF
+          [pacbrew]
+          SigLevel = Optional TrustAll
+          Server = https://pacman.mydedibox.fr/pacbrew/packages/
+          EOF
+          sudo pacman -Syu --noconfirm
+          sudo pacman -S --noconfirm ps4-openorbis ps4-openorbis-portlibs
 
+      - name: Fix missing GLES2 headers
+        run: |
+          sudo mkdir -p /opt/pacbrew/ps4/openorbis/usr/include/GLES2
+          sudo tee /opt/pacbrew/ps4/openorbis/usr/include/GLES2/gl2platform.h > /dev/null << 'EOF'
+          #ifndef __gl2platform_h_
+          #define __gl2platform_h_
+
+          #include <KHR/khrplatform.h>
+
+          typedef khronos_intptr_t GLintptr;
+          typedef khronos_ssize_t  GLsizeiptr;
+
+          #endif
+          EOF
+          ls -l /opt/pacbrew/ps4/openorbis/usr/include/GLES2/gl2platform.h
+
+      - name: Configure
+        run: |
+          mkdir -p cmake-build && cd cmake-build
+          export OPENORBIS=/opt/pacbrew/ps4/openorbis
+          cmake -G "Unix Makefiles" \
+            -DPLATFORM_PS4=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-Wno-error -Wno-unknown-warning-option -Wno-format-truncation -Wno-restrict" \
+            ..
+    
       - name: Package PKG File
         run: |
           mkdir -p ps4_pkg/sce_sys
