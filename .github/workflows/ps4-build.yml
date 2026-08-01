@@ -1,0 +1,64 @@
+name: Build PS4 Homebrew PKG
+
+on:
+  push:
+    branches: [ feature/ps4-openorbis-port, main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-ps4:
+    runs-on: ubuntu-latest
+    container:
+      image: openorbis/toolchain:latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Create Build Directory & Configure
+        run: |
+          mkdir -p build_ps4
+          cd build_ps4
+          cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/ps4.cmake -DCMAKE_BUILD_TYPE=Release ..
+
+      - name: Compile PS4 Binary
+        run: |
+          cd build_ps4
+          make -j$(nproc)
+
+      - name: Package PKG File
+        run: |
+          mkdir -p ps4_pkg/sce_sys
+          cd ps4_pkg
+          orbis-mksfo -title 'SpaghettiKart PS4' -id 'SPAG00064' sce_sys/param.sfo
+          
+          # Generate GP4 manifest dynamically
+          cat << 'EOF' > proj.gp4
+          <?xml version="1.0" encoding="utf-8"?>
+          <ingame_project version="1">
+            <volume>
+              <volume_type>pkg_ps4_app</volume_type>
+              <volume_id>SpaghettiKart</volume_id>
+              <volume_ts>2026-08-01 00:00:00</volume_ts>
+              <package_app_type>full</package_app_type>
+              <content_id>IV0000-SPAG00064_00-SPAGHETTIKARTPS4</content_id>
+              <title_id>SPAG00064</title_id>
+            </volume>
+            <files img_max_size="0">
+              <file orig_path="../build_ps4/eboot.bin" target_path="eboot.bin" />
+              <file orig_path="sce_sys/param.sfo" target_path="sce_sys/param.sfo" />
+            </files>
+          </ingame_project>
+          EOF
+
+          orbis-pub-cmd img_projectdata --costum_sys_ver "05050000" --proj_path proj.gp4
+          orbis-pub-cmd img_create proj.gp4 ../SpaghettiKart_PS4.pkg
+
+      - name: Upload Finished PKG to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpaghettiKart-PS4-PKG
+          path: SpaghettiKart_PS4.pkg
